@@ -1,38 +1,29 @@
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
-   Name = "Survival Game | Asia Elite",
-   LoadingTitle = "Loading Asia Farm...",
+   Name = "Survival Game | DEBUG EDITION",
+   LoadingTitle = "Checking Objects...",
    ConfigurationSaving = {Enabled = true, FolderName = "SurvivalElite"}
 })
 
 local Settings = {
     AutoFarm = false,
-    TweenSpeed = 45,
-    SafeHeight = 10,
-    SwordSlot = "4",
-    PickaxeSlot = "3"
+    TweenSpeed = 55,
+    SafeHeight = 12,
+    AsiaPos = Vector3.new(-1670, 520, 7280) 
 }
 
--- ASIA BIOME COORDINATES (Approximate center of Bamboo area)
-local AsiaPosition = CFrame.new(-1700, 520, 7300) 
-
--- The "Force Search" Logic
+-- 1. THE SEARCH (Checking for names specifically)
 local function GetTarget()
-    -- We look for ANY model named "The Samurai" regardless of folder
-    for _, v in pairs(workspace:GetDescendants()) do
-        if v.Name == "The Samurai" and v:IsA("Model") then
-            -- Check if it has a parts we can fly to
-            if v:FindFirstChild("HumanoidRootPart") or v:FindFirstChild("Hitbox") or v.PrimaryPart then
-                return v, "Boss"
-            end
+    local allItems = workspace:GetDescendants()
+    for _, v in pairs(allItems) do
+        -- Check for Samurai
+        if v.Name == "The Samurai" then
+            print("FOUND SAMURAI IN: " .. v.Parent.Name)
+            return v, "Boss"
         end
-    end
-    
-    -- Look for Adamantite Ores
-    for _, v in pairs(workspace:GetDescendants()) do
-        if v.Name == "Adamantite Ore" and v:IsA("Model") then
-            -- Use Attribute 'health' from your Dex screenshot
+        -- Check for Adamantite
+        if v.Name == "Adamantite Ore" then
             local hp = v:GetAttribute("health")
             if hp and hp > 0 then
                 return v, "Ore"
@@ -42,63 +33,50 @@ local function GetTarget()
     return nil, nil
 end
 
-local function Equip(slot)
-    game:GetService("VirtualInputManager"):SendKeyEvent(true, Enum.KeyCode[slot], false, game)
-    task.wait(0.3)
-end
-
-local function MoveTo(targetCF)
+-- 2. THE MOVEMENT (Sky-Path)
+local function SkyTP(targetPos)
     local hrp = game.Players.LocalPlayer.Character:WaitForChild("HumanoidRootPart")
-    local info = TweenInfo.new((targetCF.p - hrp.Position).Magnitude / Settings.TweenSpeed, Enum.EasingStyle.Linear)
-    local tween = game:GetService("TweenService"):Create(hrp, info, {CFrame = targetCF})
+    -- Up
+    hrp.CFrame = hrp.CFrame * CFrame.new(0, 500, 0)
+    task.wait(0.5)
+    -- Across
+    local tween = game:GetService("TweenService"):Create(hrp, TweenInfo.new(5, Enum.EasingStyle.Linear), {CFrame = CFrame.new(targetPos.X, 500, targetPos.Z)})
     tween:Play()
-    return tween
+    tween.Completed:Wait()
+    -- Down
+    hrp.CFrame = CFrame.new(targetPos)
+    print("Arrived in Asia.")
 end
 
+-- 3. THE FARMING LOGIC
 local function StartFarm()
+    print("Farm Started. Searching...")
     while Settings.AutoFarm do
         local target, kind = GetTarget()
         
         if target then
             if kind == "Boss" then
-                Equip(Settings.SwordSlot)
-                local t = MoveTo(target:GetPivot() * CFrame.new(0, Settings.SafeHeight, 0))
-                t.Completed:Wait()
-                
-                while target and target.Parent and Settings.AutoFarm do
-                    game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame = target:GetPivot() * CFrame.new(0, Settings.SafeHeight, 0)
-                    game:GetService("VirtualUser"):ClickButton1(Vector2.new(0,0))
-                    task.wait(0.1)
-                end
+                -- Direct TP to Boss
+                game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame = target:GetPivot() * CFrame.new(0, Settings.SafeHeight, 0)
+                game:GetService("VirtualUser"):ClickButton1(Vector2.new(0,0))
             elseif kind == "Ore" then
-                Equip(Settings.PickaxeSlot)
-                local t = MoveTo(target:GetPivot() * CFrame.new(0, 5, 0))
-                t.Completed:Wait()
-                
-                while target and target:GetAttribute("health") > 0 and Settings.AutoFarm do
-                    game:GetService("VirtualUser"):ClickButton1(Vector2.new(0,0))
-                    task.wait(0.1)
-                    -- If samurai spawns, stop mining
-                    local check, checkKind = GetTarget()
-                    if checkKind == "Boss" then break end
-                end
+                -- Direct TP to Ore
+                game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame = target:GetPivot() * CFrame.new(0, 5, 0)
+                game:GetService("VirtualUser"):ClickButton1(Vector2.new(0,0))
             end
         else
-            print("Searching for targets in Asia...")
-            task.wait(2)
+            warn("Script can't see any targets. Are you in the Asia Biome?")
         end
-        task.wait(0.5)
+        task.wait(0.2)
     end
 end
 
--- UI TABS --
-local MainTab = Window:CreateTab("Main Farm", 4483362458)
+-- UI
+local MainTab = Window:CreateTab("Asia Farm", 4483362458)
 
 MainTab:CreateButton({
-   Name = "TP to Asia Biome (Fix Search)",
-   Callback = function()
-       MoveTo(AsiaPosition)
-   end,
+   Name = "TP to Asia (Sky-Path)",
+   Callback = function() SkyTP(Settings.AsiaPos) end,
 })
 
 MainTab:CreateToggle({
@@ -108,12 +86,4 @@ MainTab:CreateToggle({
        Settings.AutoFarm = v
        if v then task.spawn(StartFarm) end
    end,
-})
-
-MainTab:CreateSlider({
-   Name = "Tween Speed",
-   Range = {20, 100},
-   Increment = 1,
-   CurrentValue = 45,
-   Callback = function(v) Settings.TweenSpeed = v end,
 })
