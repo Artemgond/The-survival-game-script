@@ -1,7 +1,7 @@
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
-   Name = "Survival Game | FORCE FARM",
+   Name = "Survival Game | Asia Elite",
    LoadingTitle = "Loading Asia Farm...",
    ConfigurationSaving = {Enabled = true, FolderName = "SurvivalElite"}
 })
@@ -14,22 +14,27 @@ local Settings = {
     PickaxeSlot = "3"
 }
 
--- Target Finding (Checks EVERYTHING in workspace)
+-- ASIA BIOME COORDINATES (Approximate center of Bamboo area)
+local AsiaPosition = CFrame.new(-1700, 520, 7300) 
+
+-- The "Force Search" Logic
 local function GetTarget()
-    -- Priority 1: Samurai
+    -- We look for ANY model named "The Samurai" regardless of folder
     for _, v in pairs(workspace:GetDescendants()) do
         if v.Name == "The Samurai" and v:IsA("Model") then
-            local hp = v:FindFirstChild("Humanoid")
-            if (hp and hp.Health > 0) or (not hp) then -- Some versions don't show HP in Dex
+            -- Check if it has a parts we can fly to
+            if v:FindFirstChild("HumanoidRootPart") or v:FindFirstChild("Hitbox") or v.PrimaryPart then
                 return v, "Boss"
             end
         end
     end
     
-    -- Priority 2: Adamantite
+    -- Look for Adamantite Ores
     for _, v in pairs(workspace:GetDescendants()) do
         if v.Name == "Adamantite Ore" and v:IsA("Model") then
-            if v:GetAttribute("health") and v:GetAttribute("health") > 0 then
+            -- Use Attribute 'health' from your Dex screenshot
+            local hp = v:GetAttribute("health")
+            if hp and hp > 0 then
                 return v, "Ore"
             end
         end
@@ -44,8 +49,7 @@ end
 
 local function MoveTo(targetCF)
     local hrp = game.Players.LocalPlayer.Character:WaitForChild("HumanoidRootPart")
-    local distance = (targetCF.p - hrp.Position).Magnitude
-    local info = TweenInfo.new(distance / Settings.TweenSpeed, Enum.EasingStyle.Linear)
+    local info = TweenInfo.new((targetCF.p - hrp.Position).Magnitude / Settings.TweenSpeed, Enum.EasingStyle.Linear)
     local tween = game:GetService("TweenService"):Create(hrp, info, {CFrame = targetCF})
     tween:Play()
     return tween
@@ -57,43 +61,46 @@ local function StartFarm()
         
         if target then
             if kind == "Boss" then
-                print("Samurai Found!")
                 Equip(Settings.SwordSlot)
-                local pivot = target:GetPivot()
-                local t = MoveTo(pivot * CFrame.new(0, Settings.SafeHeight, 0))
+                local t = MoveTo(target:GetPivot() * CFrame.new(0, Settings.SafeHeight, 0))
                 t.Completed:Wait()
                 
-                -- Attack Loop
                 while target and target.Parent and Settings.AutoFarm do
                     game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame = target:GetPivot() * CFrame.new(0, Settings.SafeHeight, 0)
                     game:GetService("VirtualUser"):ClickButton1(Vector2.new(0,0))
                     task.wait(0.1)
-                    if not target.Parent then break end
                 end
             elseif kind == "Ore" then
-                print("Ore Found!")
                 Equip(Settings.PickaxeSlot)
-                local pivot = target:GetPivot()
-                local t = MoveTo(pivot * CFrame.new(0, 5, 0))
+                local t = MoveTo(target:GetPivot() * CFrame.new(0, 5, 0))
                 t.Completed:Wait()
                 
                 while target and target:GetAttribute("health") > 0 and Settings.AutoFarm do
                     game:GetService("VirtualUser"):ClickButton1(Vector2.new(0,0))
                     task.wait(0.1)
-                    -- Check if boss spawned while mining
-                    local bossCheck = GetTarget()
-                    if bossCheck and bossCheck.Name == "The Samurai" then break end
+                    -- If samurai spawns, stop mining
+                    local check, checkKind = GetTarget()
+                    if checkKind == "Boss" then break end
                 end
             end
         else
-            print("Searching for targets...")
+            print("Searching for targets in Asia...")
             task.wait(2)
         end
         task.wait(0.5)
     end
 end
 
-local MainTab = Window:CreateTab("Main", 4483362458)
+-- UI TABS --
+local MainTab = Window:CreateTab("Main Farm", 4483362458)
+
+MainTab:CreateButton({
+   Name = "TP to Asia Biome (Fix Search)",
+   Callback = function()
+       MoveTo(AsiaPosition)
+   end,
+})
+
 MainTab:CreateToggle({
    Name = "Start Auto Farm",
    CurrentValue = false,
@@ -101,4 +108,12 @@ MainTab:CreateToggle({
        Settings.AutoFarm = v
        if v then task.spawn(StartFarm) end
    end,
+})
+
+MainTab:CreateSlider({
+   Name = "Tween Speed",
+   Range = {20, 100},
+   Increment = 1,
+   CurrentValue = 45,
+   Callback = function(v) Settings.TweenSpeed = v end,
 })
